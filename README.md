@@ -1,6 +1,5 @@
-# Duocodies.github.io
-
-* subdomain
+# Duocodies.cyou
+* Subdomain
 1. zee5.duocodies.cyou
 2. docs.duocodies.cyou
 
