@@ -1,5 +1,5 @@
 # Duocodies.github.io
 
 * subdomain
-zee5.duocodies.cyou
-docs.duocodies.cyou
+1. zee5.duocodies.cyou
+2. docs.duocodies.cyou
