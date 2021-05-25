@@ -1,7 +1,7 @@
 # Duocodies.cyou
 * Subdomain
 1. [zee5.duocodies.cyou]
-2. [docs.duocodies.cyou]
+2. [token.duocodies.cyou]
 
 * Social Media
 1. [Instagram](https://instagram.com/duocodies)
