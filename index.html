@@ -11,14 +11,6 @@
        
         <title>Duocodies</title>
 
-        <script src="https://code.jquery.com/jquery-3.3.1.js">
-        </script>
-        <script> 
-        $(function(){
-        $("#header").load("header.html"); 
-        $("#footer").load("footer.html"); 
-        });
-        </script> 
 
         
 		<link rel="shortcut icon" type="image/x-icon" href="img/favicon.png">
@@ -65,7 +57,35 @@
             <div class="spinner"></div>
         </div><!-- Preloader -->
         
-<div id="header"></div>
+                <header id="header" class="header-section">
+            <div class="container">
+                <nav class="navbar ">
+                    <a href="index.html" class="navbar-brand"><img src="img/favicon.png" alt="Duocodies" height="70" width="90">DUOCODIES</a>
+                    <div class="d-flex menu-wrap">
+                       <div id="mainmenu" class="mainmenu">
+                           <ul class="nav">
+                               <li><a data-scroll class="nav-link active" href="index.html">Home</a> 
+                                </li>
+                                <li><a href="about-us.html">About</a> 
+                                </li>
+                                <li><a href="services.html">Services</a> 
+                                </li>
+                                <li><a href="Contact-us.html">Contact</a> 
+                                </li>
+                                
+                             
+                            </ul>
+                       </div>
+                       <div class="header-right">
+                          
+                       </div>
+                    </div>
+                </nav>
+            </div>
+		</header> <!--.header-section -->
+		
+        <div class="header-height"></div>
+
         
         <section class="hero-section bg-grey d-flex align-items-center bd-bottom">
             <div class="hero-bg-shape"></div>
