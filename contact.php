@@ -17,7 +17,7 @@
         }
 
         // Update this to your desired email address.
-        $recipient = "contact@yourdomain.com";
+        $recipient = "admin@duocodies.cyou";
 		$subject = "Message from $name";
 
         // Email content.
