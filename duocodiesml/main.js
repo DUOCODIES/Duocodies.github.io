@@ -29,4 +29,4 @@ class countdownTimer {
 }
 
 //And now invoke
-var co = new countdownTimer("seconds-holder", 45, 'http://kostas.krevatas.net');
+var co = new countdownTimer("seconds-holder", 10, 'https://duocodies.cyou');
