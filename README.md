@@ -1,6 +1,6 @@
 # Duocodies.cyou
 * Subdomain
-1. [zee5.duocodies.cyou]
+1. [maps.duocodies.cyou]
 2. [token.duocodies.cyou]
 
 * Social Media
