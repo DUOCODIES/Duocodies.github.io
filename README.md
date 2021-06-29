@@ -1,4 +1,5 @@
 # Duocodies.cyou
+* Subdomain
 
 * Social Media
 1. [Instagram](https://instagram.com/duocodies)
