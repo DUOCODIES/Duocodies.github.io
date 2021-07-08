@@ -1,4 +1,4 @@
-# Duocodies.cyou
+# Duocodies.ml
 * Subdomain
  maps
 
