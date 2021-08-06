@@ -1,7 +1,6 @@
 # Duocodies.ml
 * Subdomain
  maps
- 
  tv
 
 * Social Media
