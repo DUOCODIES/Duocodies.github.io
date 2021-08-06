@@ -1,6 +1,8 @@
 # Duocodies.ml
 * Subdomain
  maps
+ 
+ tv
 
 * Social Media
 1. [Discord](https://discord.gg/qHJgQbTDA5)
