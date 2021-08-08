@@ -2,6 +2,7 @@
 * Subdomain
  maps
  tv
+ shop
 
 * Social Media
 1. [Discord](https://discord.gg/qHJgQbTDA5)
