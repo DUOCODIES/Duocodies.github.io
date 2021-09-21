@@ -1,10 +1,5 @@
 # Duocodies.ml
 * Subdomain
- maps
- tv
- shop
- streamme
- app
  
 
 * Social Media
