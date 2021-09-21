@@ -1,6 +1,6 @@
 # Duocodies.ml
 * Subdomain
-* app
+app,rdp
  
 
 * Social Media
