@@ -1,6 +1,5 @@
-# Duocodies.ml
-* Subdomain
-app,rdp
+# Duocodies.com [![Netlify Status](https://api.netlify.com/api/v1/badges/2dc9dfd3-4f6c-44da-bde3-50258012930e/deploy-status)](https://app.netlify.com/sites/duocodies/deploys)
+
  
 
 * Social Media
