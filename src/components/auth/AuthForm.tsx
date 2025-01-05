@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../stores/authStore';
+import { Loader2 } from 'lucide-react';
 
 export function AuthForm() {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn, signUp } = useAuthStore();
+  const { signIn } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,11 +15,7 @@ export function AuthForm() {
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        await signUp(email, password);
-      } else {
-        await signIn(email, password);
-      }
+      await signIn(email, password);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Authentication failed');
     } finally {
@@ -32,20 +28,10 @@ export function AuthForm() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {isSignUp ? 'Create your account' : 'Sign in to Duo'}
+            Sign in to Duo
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError(null);
-              }}
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              {isSignUp ? 'Sign in' : 'Sign up'}
-            </button>
+            Please sign in with your credentials
           </p>
         </div>
         
@@ -62,7 +48,9 @@ export function AuthForm() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
+              <label htmlFor="email" className="sr-only">Email address</label>
               <input
+                id="email"
                 type="email"
                 required
                 value={email}
@@ -73,7 +61,9 @@ export function AuthForm() {
               />
             </div>
             <div>
+              <label htmlFor="password" className="sr-only">Password</label>
               <input
+                id="password"
                 type="password"
                 required
                 value={password}
@@ -93,13 +83,10 @@ export function AuthForm() {
             >
               {loading ? (
                 <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <Loader2 className="animate-spin h-5 w-5 text-white" />
                 </span>
               ) : null}
-              {isSignUp ? 'Sign up' : 'Sign in'}
+              Sign in
             </button>
           </div>
         </form>
