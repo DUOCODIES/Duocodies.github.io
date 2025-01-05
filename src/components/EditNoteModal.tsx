@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { useNoteStore } from '../stores/noteStore';
+import type { Database } from '../lib/database.types';
 
-interface NewNoteModalProps {
+type Note = Database['public']['Tables']['notes']['Row'];
+
+interface EditNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
+  note: Note;
 }
 
-export function NewNoteModal({ isOpen, onClose }: NewNoteModalProps) {
-  const { createNote } = useNoteStore();
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
+  const { updateNote } = useNoteStore();
+  const [title, setTitle] = useState(note.title);
+  const [content, setContent] = useState(note.content || '');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,17 +27,18 @@ export function NewNoteModal({ isOpen, onClose }: NewNoteModalProps) {
     }
 
     try {
-      await createNote(title.trim(), content.trim());
+      await updateNote(note.id, {
+        title: title.trim(),
+        content: content.trim(),
+      });
       onClose();
-      setTitle('');
-      setContent('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create note');
+      setError(err instanceof Error ? err.message : 'Failed to update note');
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Note">
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Note">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
@@ -79,10 +84,10 @@ export function NewNoteModal({ isOpen, onClose }: NewNoteModalProps) {
             type="submit"
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Create Note
+            Save Changes
           </button>
         </div>
       </form>
     </Modal>
   );
-}
+} 
