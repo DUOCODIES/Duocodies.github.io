@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { LayoutGrid, List, Star, Trash2, Tag as TagIcon, X, Bookmark, CheckSquare, FileSpreadsheet, FileText } from 'lucide-react';
 import { useNoteStore } from '../stores/noteStore';
 import { useTagStore } from '../stores/tagStore';
@@ -9,6 +9,34 @@ import { ImportBookmarksModal } from './ImportBookmarksModal';
 
 type Note = Database['public']['Tables']['notes']['Row'];
 type Tag = Database['public']['Tables']['tags']['Row'];
+
+const NoteCardWrapper = memo(function NoteCardWrapper({ 
+  note, 
+  isSelected, 
+  onToggleSelect 
+}: { 
+  note: Note; 
+  isSelected: boolean; 
+  onToggleSelect: (id: string) => void;
+}) {
+  return (
+    <div className="relative group">
+      <div
+        className={`absolute top-2 left-2 z-10 ${
+          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } transition-opacity`}
+      >
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(note.id)}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      </div>
+      <NoteCard {...note} />
+    </div>
+  );
+});
 
 export function Dashboard() {
   const { notes, getFilteredNotes, fetchNotes, filter, selectedTagId, toggleFavorite, moveToTrash, permanentlyDelete } = useNoteStore();
@@ -22,6 +50,15 @@ export function Dashboard() {
   const [showImportBookmarks, setShowImportBookmarks] = useState(false);
   const tagMenuRef = useRef<HTMLDivElement>(null);
 
+  const displayedNotes = useMemo(() => 
+    filter === 'tag' ? tagFilteredNotes : getFilteredNotes(),
+    [filter, tagFilteredNotes, getFilteredNotes]
+  );
+
+  const selectedCount = useMemo(() => selectedNotes.size, [selectedNotes]);
+  const hasSelectedNotes = selectedCount > 0;
+  const allSelected = selectedCount === displayedNotes.length;
+
   useEffect(() => {
     fetchNotes().catch(console.error);
   }, [fetchNotes]);
@@ -31,15 +68,12 @@ export function Dashboard() {
       if (filter === 'tag' && selectedTagId) {
         setLoading(true);
         try {
-          const filteredNotes = [];
           const allNotes = getFilteredNotes();
-          
-          for (const note of allNotes) {
-            const noteTags = await getNoteTags(note.id);
-            if (noteTags.some(tag => tag.id === selectedTagId)) {
-              filteredNotes.push(note);
-            }
-          }
+          // Fetch all note-tag relationships at once
+          const allNoteTags = await Promise.all(allNotes.map(note => getNoteTags(note.id)));
+          const filteredNotes = allNotes.filter((note, index) => 
+            allNoteTags[index].some(tag => tag.id === selectedTagId)
+          );
           
           setTagFilteredNotes(filteredNotes);
         } catch (error) {
@@ -67,7 +101,7 @@ export function Dashboard() {
     };
   }, []);
 
-  const toggleNoteSelection = (noteId: string) => {
+  const toggleNoteSelection = useCallback((noteId: string) => {
     setSelectedNotes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(noteId)) {
@@ -77,9 +111,9 @@ export function Dashboard() {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const handleBulkFavorite = async () => {
+  const handleBulkFavorite = useCallback(async () => {
     try {
       await Promise.all(
         Array.from(selectedNotes).map(noteId => toggleFavorite(noteId))
@@ -88,9 +122,9 @@ export function Dashboard() {
     } catch (error) {
       console.error('Failed to update favorites:', error);
     }
-  };
+  }, [selectedNotes, toggleFavorite]);
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = useCallback(async () => {
     try {
       if (filter === 'trash') {
         await Promise.all(
@@ -106,24 +140,21 @@ export function Dashboard() {
     } catch (error) {
       console.error('Failed to delete notes:', error);
     }
-  };
+  }, [filter, selectedNotes, permanentlyDelete, moveToTrash]);
 
-  const handleBulkAddTag = async (tagId: string) => {
+  const handleBulkAddTag = useCallback(async (tagId: string) => {
     try {
       setLoading(true);
       
-      // Check if all selected notes have this tag
       const selectedNotesArray = Array.from(selectedNotes);
-      const notesWithTags = await Promise.all(
-        selectedNotesArray.map(async noteId => {
-          const noteTags = await getNoteTags(noteId);
-          return noteTags.some(tag => tag.id === tagId);
-        })
+      const allNoteTags = await Promise.all(
+        selectedNotesArray.map(noteId => getNoteTags(noteId))
       );
       
-      const allHaveTag = notesWithTags.every(hasTag => hasTag);
+      const allHaveTag = allNoteTags.every(noteTags => 
+        noteTags.some(tag => tag.id === tagId)
+      );
       
-      // If all notes have the tag, remove it from all. Otherwise, add it to all.
       await Promise.all(
         selectedNotesArray.map(noteId => 
           allHaveTag ? removeTagFromNote(noteId, tagId) : addTagToNote(noteId, tagId)
@@ -137,20 +168,27 @@ export function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedNotes, getNoteTags, removeTagFromNote, addTagToNote, fetchNotes]);
 
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     const currentNotes = displayedNotes;
-    if (selectedNotes.size === currentNotes.length) {
-      // If all notes are selected, deselect all
-      setSelectedNotes(new Set());
-    } else {
-      // Otherwise, select all displayed notes
-      setSelectedNotes(new Set(currentNotes.map(note => note.id)));
-    }
-  };
+    setSelectedNotes(prev => 
+      prev.size === currentNotes.length ? new Set() : new Set(currentNotes.map(note => note.id))
+    );
+  }, [displayedNotes]);
 
-  const displayedNotes = filter === 'tag' ? tagFilteredNotes : getFilteredNotes();
+  const renderNotes = useMemo(() => (
+    <div className={`grid gap-4 ${isGridView ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+      {displayedNotes.map(note => (
+        <NoteCardWrapper
+          key={note.id}
+          note={note}
+          isSelected={selectedNotes.has(note.id)}
+          onToggleSelect={toggleNoteSelection}
+        />
+      ))}
+    </div>
+  ), [displayedNotes, isGridView, selectedNotes, toggleNoteSelection]);
 
   return (
     <div className="p-6">
@@ -197,19 +235,19 @@ export function Dashboard() {
             <button
               onClick={handleSelectAll}
               className={`p-2 rounded-lg transition-colors ${
-                selectedNotes.size > 0 ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
+                hasSelectedNotes ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
               }`}
-              title={selectedNotes.size === displayedNotes.length ? 'Deselect all' : 'Select all'}
+              title={allSelected ? 'Deselect all' : 'Select all'}
             >
               <CheckSquare size={20} />
             </button>
           )}
         </div>
 
-        {selectedNotes.size > 0 && (
+        {hasSelectedNotes && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
-              {selectedNotes.size} of {displayedNotes.length} selected
+              {selectedCount} of {displayedNotes.length} selected
             </span>
             <button
               onClick={handleBulkFavorite}
@@ -231,29 +269,26 @@ export function Dashboard() {
                   <div className="px-4 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-100">
                     Toggle tags for selected notes
                   </div>
-                  {allTags.map(tag => {
-                    const isChecking = loading;
-                    return (
-                      <button
-                        key={tag.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBulkAddTag(tag.id);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                        disabled={loading}
-                      >
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: tag.color }}
-                        />
-                        <span className="flex-1">{tag.name}</span>
-                        {isChecking && (
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                        )}
-                      </button>
-                    );
-                  })}
+                  {allTags.map(tag => (
+                    <button
+                      key={tag.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBulkAddTag(tag.id);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                      disabled={loading}
+                    >
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      <span className="flex-1">{tag.name}</span>
+                      {loading && (
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                      )}
+                    </button>
+                  ))}
                   {allTags.length === 0 && (
                     <div className="px-4 py-2 text-sm text-gray-500">
                       No tags available
@@ -289,27 +324,7 @@ export function Dashboard() {
           <p className="text-lg">No notes found</p>
           <p className="text-sm mt-1">Create a new note to get started</p>
         </div>
-      ) : (
-        <div className={`grid gap-4 ${isGridView ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-          {displayedNotes.map(note => (
-            <div key={note.id} className="relative group">
-              <div
-                className={`absolute top-2 left-2 z-10 ${
-                  selectedNotes.has(note.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                } transition-opacity`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedNotes.has(note.id)}
-                  onChange={() => toggleNoteSelection(note.id)}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-              </div>
-              <NoteCard {...note} />
-            </div>
-          ))}
-        </div>
-      )}
+      ) : renderNotes}
 
       <ConfirmationModal
         isOpen={showDeleteConfirm}
