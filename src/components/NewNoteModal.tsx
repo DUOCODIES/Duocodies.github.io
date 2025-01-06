@@ -13,7 +13,7 @@ interface NewNoteModalProps {
 }
 
 export function NewNoteModal({ isOpen, onClose }: NewNoteModalProps) {
-  const { createNote } = useNoteStore();
+  const { createNote, toggleFavorite } = useNoteStore();
   const { tags: allTags } = useTagStore();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -21,34 +21,43 @@ export function NewNoteModal({ isOpen, onClose }: NewNoteModalProps) {
   const [showTagMenu, setShowTagMenu] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
     if (!title.trim()) {
       setError('Title is required');
+      setIsLoading(false);
       return;
     }
 
     try {
       const note = await createNote(title.trim(), content.trim());
+      
+      // Handle favorite status
       if (isFavorite) {
-        await useNoteStore.getState().toggleFavorite(note.id);
+        await toggleFavorite(note.id);
       }
+      
       // Add tags to the newly created note
       if (selectedTags.length > 0) {
         await Promise.all(
           selectedTags.map(tag => useTagStore.getState().addTagToNote(note.id, tag.id))
         );
       }
+      
       onClose();
       setTitle('');
       setContent('');
       setSelectedTags([]);
       setIsFavorite(false);
+      setIsLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create note');
+      setIsLoading(false);
     }
   };
 

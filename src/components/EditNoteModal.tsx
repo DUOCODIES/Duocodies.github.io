@@ -15,7 +15,7 @@ interface EditNoteModalProps {
 }
 
 export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
-  const { updateNote } = useNoteStore();
+  const { updateNote, toggleFavorite } = useNoteStore();
   const { tags: allTags, getNoteTags, addTagToNote, removeTagFromNote } = useTagStore();
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content || '');
@@ -40,6 +40,15 @@ export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
         .catch(console.error);
     }
   }, [isOpen, note.id, getNoteTags]);
+
+  const handleFavoriteClick = async () => {
+    try {
+      await toggleFavorite(note.id);
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +104,7 @@ export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
           <div className="flex items-center gap-2 pt-6">
             <button
               type="button"
-              onClick={() => setIsFavorite(!isFavorite)}
+              onClick={handleFavoriteClick}
               className={`p-2 rounded-lg hover:bg-gray-100 transition-colors ${
                 isFavorite ? 'text-yellow-500' : 'text-gray-400'
               }`}
