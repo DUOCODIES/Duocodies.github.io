@@ -28,10 +28,20 @@ export function Sidebar() {
     fetchTags().catch(console.error);
   }, [fetchTags]);
 
-  // Count calculations
-  const activeNotesCount = notes.filter(note => !note.is_deleted).length;
-  const favoriteNotesCount = notes.filter(note => note.is_favorite && !note.is_deleted).length;
-  const trashedNotesCount = notes.filter(note => note.is_deleted).length;
+  // Count calculations - moved outside of render for clarity
+  const calculateCounts = () => {
+    const allNotes = notes.filter(note => !note.is_deleted);
+    const favoriteNotes = notes.filter(note => note.is_favorite && !note.is_deleted);
+    const trashedNotes = notes.filter(note => note.is_deleted);
+
+    return {
+      activeNotesCount: allNotes.length,
+      favoriteNotesCount: favoriteNotes.length,
+      trashedNotesCount: trashedNotes.length
+    };
+  };
+
+  const { activeNotesCount, favoriteNotesCount, trashedNotesCount } = calculateCounts();
 
   const handleSignOut = () => {
     setShowSignOutConfirm(true);

@@ -68,6 +68,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to fetch notes');
 
+      // Always fetch all notes for correct counting
       const { data, error } = await supabase
         .from('notes')
         .select('*')
@@ -86,7 +87,10 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to fetch notes');
 
-      // Use a direct join query from notes table
+      // First fetch all notes for correct counting
+      await get().fetchNotes();
+
+      // Then fetch notes for the selected tag
       const { data, error } = await supabase
         .from('notes')
         .select('*, note_tags!inner(tag_id)')
@@ -97,12 +101,12 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
       if (error) throw error;
 
-      // The data is already in the correct Note type format
-      const notes = data || [];
-      
-      // Update cache and current notes
-      const newCache = { ...get().noteCache, [tagId]: notes };
-      set({ notes, noteCache: newCache });
+      // Only update the filtered notes, keeping the total notes intact
+      const filteredNotes = data || [];
+      set(state => ({
+        ...state,
+        notes: state.filter === 'tag' ? filteredNotes : state.notes
+      }));
     } catch (error) {
       console.error('Error fetching notes by tag:', error);
     }
