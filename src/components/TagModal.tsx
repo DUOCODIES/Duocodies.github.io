@@ -1,18 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { useTagStore } from '../stores/tagStore';
 
 const COLORS = [
-  '#EF4444', // red
-  '#F97316', // orange
-  '#F59E0B', // amber
-  '#84CC16', // lime
-  '#10B981', // emerald
-  '#06B6D4', // cyan
-  '#3B82F6', // blue
-  '#6366F1', // indigo
-  '#8B5CF6', // violet
-  '#EC4899', // pink
+  '#DC2626', // dark red
+  '#EA580C', // dark orange
+  '#D97706', // dark amber
+  '#65A30D', // dark lime
+  '#059669', // dark emerald
+  '#0891B2', // dark cyan
+  '#2563EB', // dark blue
+  '#4F46E5', // dark indigo
+  '#7C3AED', // dark violet
+  '#DB2777', // dark pink
+  '#9333EA', // dark purple
+  '#0F766E', // dark teal
+  '#B91C1C', // darker red
+  '#C2410C', // darker orange
+  '#A16207', // darker amber
 ];
 
 interface TagModalProps {
@@ -32,6 +37,15 @@ export function TagModal({ isOpen, onClose, editTag }: TagModalProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Reset form when editTag changes or modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setName(editTag?.name || '');
+      setColor(editTag?.color || COLORS[0]);
+      setError('');
+    }
+  }, [isOpen, editTag]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -50,8 +64,6 @@ export function TagModal({ isOpen, onClose, editTag }: TagModalProps) {
         await createTag({ name: name.trim(), color });
       }
       onClose();
-      setName('');
-      setColor(COLORS[0]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save tag');
     } finally {

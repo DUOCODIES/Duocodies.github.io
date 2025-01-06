@@ -14,11 +14,28 @@ interface BookmarkWithFolder {
   folderName: string | null;
 }
 
+// Define a list of dark colors to choose from
+const DARK_COLORS = [
+  '#DC2626', // dark red
+  '#EA580C', // dark orange
+  '#D97706', // dark amber
+  '#65A30D', // dark lime
+  '#059669', // dark emerald
+  '#0891B2', // dark cyan
+  '#2563EB', // dark blue
+  '#4F46E5', // dark indigo
+  '#7C3AED', // dark violet
+  '#DB2777', // dark pink
+  '#9333EA', // dark purple
+  '#0F766E', // dark teal
+  '#B91C1C', // darker red
+  '#C2410C', // darker orange
+  '#A16207', // darker amber
+];
+
 function generatePastelColor(): string {
-  const hue = Math.floor(Math.random() * 360);
-  const saturation = 50 + Math.random() * 20;
-  const lightness = 75 + Math.random() * 10;
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  // Return a random dark color from our predefined list
+  return DARK_COLORS[Math.floor(Math.random() * DARK_COLORS.length)];
 }
 
 export function ImportBookmarksModal({ isOpen, onClose }: ImportBookmarksModalProps) {
