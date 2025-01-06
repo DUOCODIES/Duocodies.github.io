@@ -15,15 +15,24 @@ interface EditNoteModalProps {
 }
 
 export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
-  const { updateNote, toggleFavorite } = useNoteStore();
+  const { updateNote } = useNoteStore();
   const { tags: allTags, getNoteTags, addTagToNote, removeTagFromNote } = useTagStore();
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content || '');
-  const [error, setError] = useState('');
-  const [showTagMenu, setShowTagMenu] = useState(false);
-  const [noteTags, setNoteTags] = useState<Tag[]>([]);
   const [isFavorite, setIsFavorite] = useState(note.is_favorite);
+  const [noteTags, setNoteTags] = useState<Tag[]>([]);
+  const [showTagMenu, setShowTagMenu] = useState(false);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
+  // Reset form when note changes
+  useEffect(() => {
+    setTitle(note.title);
+    setContent(note.content || '');
+    setIsFavorite(note.is_favorite);
+  }, [note]);
+
+  // Fetch tags when modal opens
   useEffect(() => {
     if (isOpen) {
       getNoteTags(note.id)
@@ -35,20 +44,19 @@ export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (!title.trim()) {
-      setError('Title is required');
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      await updateNote(note.id, {
-        title: title.trim(),
-        content: content.trim(),
-      });
+      if (!title.trim()) {
+        throw new Error('Title is required');
+      }
+
+      await updateNote(note.id, title.trim(), content);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update note');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -57,25 +65,13 @@ export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
       const hasTag = noteTags.some(tag => tag.id === tagId);
       if (hasTag) {
         await removeTagFromNote(note.id, tagId);
-        setNoteTags(noteTags.filter(tag => tag.id !== tagId));
       } else {
         await addTagToNote(note.id, tagId);
-        const newTag = allTags.find(tag => tag.id === tagId);
-        if (newTag) {
-          setNoteTags([...noteTags, newTag]);
-        }
       }
+      const updatedTags = await getNoteTags(note.id);
+      setNoteTags(updatedTags);
     } catch (error) {
-      console.error('Failed to toggle tag:', error);
-    }
-  };
-
-  const handleToggleFavorite = async () => {
-    try {
-      await toggleFavorite(note.id);
-      setIsFavorite(!isFavorite);
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
+      console.error('Error updating note tags:', error);
     }
   };
 
@@ -99,7 +95,7 @@ export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
           <div className="flex items-center gap-2 pt-6">
             <button
               type="button"
-              onClick={handleToggleFavorite}
+              onClick={() => setIsFavorite(!isFavorite)}
               className={`p-2 rounded-lg hover:bg-gray-100 transition-colors ${
                 isFavorite ? 'text-yellow-500' : 'text-gray-400'
               }`}
@@ -151,24 +147,6 @@ export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
           </div>
         </div>
 
-        {noteTags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {noteTags.map(tag => (
-              <div
-                key={tag.id}
-                className="flex items-center gap-1 px-2 py-1 rounded-full text-xs"
-                style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
-              >
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: tag.color }}
-                />
-                {tag.name}
-              </div>
-            ))}
-          </div>
-        )}
-
         <div>
           <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
             Content
@@ -178,7 +156,7 @@ export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={8}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none whitespace-pre-wrap"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             placeholder="Enter note content"
           />
         </div>
@@ -197,9 +175,10 @@ export function EditNoteModal({ isOpen, onClose, note }: EditNoteModalProps) {
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={isLoading}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save Changes
+            {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>

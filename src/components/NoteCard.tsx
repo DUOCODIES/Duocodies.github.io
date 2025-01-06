@@ -1,13 +1,17 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Star, MoreVertical, Trash2, Pencil, RotateCcw, ExternalLink, Tag as TagIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { Star, Trash2, RotateCcw, Tag as TagIcon, Pencil, ExternalLink } from 'lucide-react';
 import { useNoteStore } from '../stores/noteStore';
 import { useTagStore } from '../stores/tagStore';
-import type { Database } from '../lib/database.types';
-import { EditNoteModal } from './EditNoteModal';
 import { ConfirmationModal } from './ConfirmationModal';
+import { EditNoteModal } from './EditNoteModal';
+import type { Database } from '../lib/database.types';
 
 type Note = Database['public']['Tables']['notes']['Row'];
 type Tag = Database['public']['Tables']['tags']['Row'];
+
+interface NoteCardProps extends Note {
+  onEdit?: (note: Note) => void;
+}
 
 // URL detection regex
 const URL_REGEX = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
@@ -36,258 +40,180 @@ function renderContentWithLinks(content: string | null) {
   });
 }
 
-export function NoteCard({ id, title, content, updated_at, is_favorite, is_deleted }: Note) {
+export function NoteCard({ id, title, content, is_favorite, is_deleted, created_at, updated_at, user_id }: NoteCardProps) {
   const { toggleFavorite, moveToTrash, restoreFromTrash, permanentlyDelete } = useNoteStore();
   const { tags: allTags, getNoteTags, addTagToNote, removeTagFromNote } = useTagStore();
-  const [showMenu, setShowMenu] = React.useState(false);
-  const [showEditModal, setShowEditModal] = React.useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
-  const [showTagMenu, setShowTagMenu] = React.useState(false);
+  const [showTagMenu, setShowTagMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [noteTags, setNoteTags] = useState<Tag[]>([]);
-  
-  const menuRef = useRef<HTMLDivElement>(null);
-  const tagMenuRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    getNoteTags(id)
-      .then(setNoteTags)
-      .catch(console.error);
+  React.useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const tags = await getNoteTags(id);
+        setNoteTags(tags);
+      } catch (error) {
+        console.error('Error fetching note tags:', error);
+      }
+    };
+    fetchTags();
   }, [id, getNoteTags]);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
-      if (tagMenuRef.current && !tagMenuRef.current.contains(event.target as Node)) {
-        setShowTagMenu(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const handleToggleFavorite = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleFavorite(id).catch(console.error);
-  };
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowDeleteConfirm(true);
-    setShowMenu(false);
-  };
-
-  const handleConfirmDelete = () => {
-    if (is_deleted) {
-      permanentlyDelete(id).catch(console.error);
-    } else {
-      moveToTrash(id).catch(console.error);
-    }
-  };
-
-  const handleRestore = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    restoreFromTrash(id).catch(console.error);
-    setShowMenu(false);
-  };
-
-  const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowEditModal(true);
-    setShowMenu(false);
-  };
-
-  const handleTagClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowTagMenu(!showTagMenu);
-    setShowMenu(false); // Close other menu if open
-  };
-
-  const handleMoreClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(!showMenu);
-    setShowTagMenu(false); // Close other menu if open
-  };
-
-  const toggleTag = async (tagId: string) => {
+  const handleTagClick = async (tagId: string) => {
+    setIsLoading(true);
     try {
       const hasTag = noteTags.some(tag => tag.id === tagId);
       if (hasTag) {
         await removeTagFromNote(id, tagId);
-        setNoteTags(noteTags.filter(tag => tag.id !== tagId));
       } else {
         await addTagToNote(id, tagId);
-        const newTag = allTags.find(tag => tag.id === tagId);
-        if (newTag) {
-          setNoteTags([...noteTags, newTag]);
-        }
       }
+      const updatedTags = await getNoteTags(id);
+      setNoteTags(updatedTags);
     } catch (error) {
-      console.error('Failed to toggle tag:', error);
+      console.error('Error updating note tags:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const formattedDate = new Date(updated_at).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  const handleDelete = async () => {
+    if (is_deleted) {
+      await permanentlyDelete(id);
+    } else {
+      await moveToTrash(id);
+    }
+    setShowDeleteConfirm(false);
+  };
 
   return (
-    <>
-      <div 
-        className="group bg-white p-3 rounded-lg border border-gray-200 hover:shadow-lg transition-all cursor-pointer"
-        onClick={() => {
-          setShowMenu(false);
-          setShowTagMenu(false);
-        }}
-      >
-        <div className="flex items-start justify-between mb-1">
-          <h3 className="text-base font-semibold text-gray-800 line-clamp-1">{title}</h3>
-          <div className="flex gap-1">
-            {!is_deleted && (
-              <>
-                <button
-                  onClick={handleToggleFavorite}
-                  className={`p-0.5 rounded-full hover:bg-gray-100 transition-colors ${
-                    is_favorite ? 'text-yellow-500' : 'text-gray-400 opacity-0 group-hover:opacity-100'
-                  }`}
-                  title={is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  <Star size={16} />
-                </button>
-                <div className="relative" ref={tagMenuRef}>
+    <div
+      className={`relative group bg-white rounded-lg shadow-sm border border-gray-200 p-4 transition-all duration-200 hover:shadow-md ${
+        is_deleted ? 'opacity-75' : ''
+      }`}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <h3 className="text-lg font-medium text-gray-900 line-clamp-2">{title}</h3>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowEditModal(true);
+            }}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-gray-100 transition-colors"
+            title="Edit note"
+          >
+            <Pencil size={18} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavorite(id);
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${
+              is_favorite
+                ? 'text-yellow-500 hover:bg-yellow-50'
+                : 'text-gray-400 hover:text-yellow-500 hover:bg-gray-100'
+            }`}
+          >
+            <Star size={18} fill={is_favorite ? 'currentColor' : 'none'} />
+          </button>
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTagMenu(!showTagMenu);
+              }}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-gray-100 transition-colors"
+            >
+              <TagIcon size={18} />
+            </button>
+            {showTagMenu && (
+              <div className="absolute right-0 mt-1 py-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                <div className="px-4 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-100">
+                  Add or remove tags
+                </div>
+                {allTags.map(tag => (
                   <button
-                    onClick={handleTagClick}
-                    className="p-0.5 rounded-full hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Manage tags"
+                    key={tag.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTagClick(tag.id);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
                   >
-                    <TagIcon size={16} />
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    <span className="flex-1">{tag.name}</span>
+                    {noteTags.some(t => t.id === tag.id) && (
+                      <span className="text-blue-500">✓</span>
+                    )}
                   </button>
-                  {showTagMenu && (
-                    <div className="absolute right-0 mt-1 py-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                      <div className="px-4 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-100">
-                        Select multiple tags
-                      </div>
-                      {allTags.map(tag => (
-                        <button
-                          key={tag.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleTag(tag.id);
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <div className="flex items-center justify-center w-4 h-4 border border-gray-300 rounded">
-                            {noteTags.some(t => t.id === tag.id) && (
-                              <div className="w-2 h-2 rounded-sm bg-blue-500" />
-                            )}
-                          </div>
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: tag.color }}
-                          />
-                          <span className="flex-1">{tag.name}</span>
-                        </button>
-                      ))}
-                      {allTags.length === 0 && (
-                        <div className="px-4 py-2 text-sm text-gray-500">
-                          No tags available
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={handleMoreClick}
-                className="p-0.5 rounded-full hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="More options"
-              >
-                <MoreVertical size={16} />
-              </button>
-              {showMenu && (
-                <div className="absolute right-0 mt-1 py-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                  {is_deleted ? (
-                    <>
-                      <button
-                        onClick={handleRestore}
-                        className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
-                      >
-                        <RotateCcw size={16} />
-                        Restore note
-                      </button>
-                      <button
-                        onClick={handleDelete}
-                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                      >
-                        <Trash2 size={16} />
-                        Delete permanently
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={handleEdit}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <Pencil size={16} />
-                        Edit note
-          </button>
-                      <button
-                        onClick={handleDelete}
-                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                      >
-                        <Trash2 size={16} />
-                        Move to trash
-          </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        {noteTags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-1">
-            {noteTags.map(tag => (
-              <div
-                key={tag.id}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px]"
-                style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
-              >
-                <div
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: tag.color }}
-                />
-                {tag.name}
+                ))}
+                {allTags.length === 0 && (
+                  <div className="px-4 py-2 text-sm text-gray-500">
+                    No tags available
+                  </div>
+                )}
               </div>
-            ))}
+            )}
           </div>
-        )}
-        <p className="text-sm text-gray-600 mb-2 line-clamp-2 whitespace-pre-wrap">
-          {renderContentWithLinks(content)}
-        </p>
-        <time className="text-xs text-gray-400">{formattedDate}</time>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (is_deleted) {
+                restoreFromTrash(id);
+              } else {
+                setShowDeleteConfirm(true);
+              }
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${
+              is_deleted
+                ? 'text-green-500 hover:bg-green-50'
+                : 'text-gray-400 hover:text-red-500 hover:bg-gray-100'
+            }`}
+          >
+            {is_deleted ? <RotateCcw size={18} /> : <Trash2 size={18} />}
+          </button>
+        </div>
       </div>
 
-      <EditNoteModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        note={{ id, title, content, updated_at, is_favorite, is_deleted, user_id: '', created_at: '' }}
-      />
+      <div className="text-gray-600 text-sm line-clamp-3 whitespace-pre-wrap mb-2">
+        {renderContentWithLinks(content)}
+      </div>
+
+      {noteTags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {noteTags.map(tag => (
+            <span
+              key={tag.id}
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+              style={{
+                backgroundColor: `${tag.color}20`,
+                color: tag.color,
+              }}
+            >
+              {tag.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+        </div>
+      )}
 
       <ConfirmationModal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleConfirmDelete}
-        title={is_deleted ? 'Delete Permanently' : 'Move to Trash'}
+        onConfirm={handleDelete}
+        title={is_deleted ? 'Delete Note Permanently' : 'Move to Trash'}
         message={
           is_deleted
             ? 'Are you sure you want to permanently delete this note? This action cannot be undone.'
@@ -296,6 +222,21 @@ export function NoteCard({ id, title, content, updated_at, is_favorite, is_delet
         confirmText={is_deleted ? 'Delete Forever' : 'Move to Trash'}
         isDanger={is_deleted}
       />
-    </>
+
+      <EditNoteModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        note={{
+          id,
+          title,
+          content,
+          is_favorite,
+          is_deleted,
+          created_at,
+          updated_at,
+          user_id
+        }}
+      />
+    </div>
   );
 }

@@ -30,13 +30,16 @@ export function TagModal({ isOpen, onClose, editTag }: TagModalProps) {
   const [name, setName] = useState(editTag?.name || '');
   const [color, setColor] = useState(editTag?.color || COLORS[0]);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
     if (!name.trim()) {
       setError('Tag name is required');
+      setIsLoading(false);
       return;
     }
 
@@ -44,13 +47,15 @@ export function TagModal({ isOpen, onClose, editTag }: TagModalProps) {
       if (editTag) {
         await updateTag(editTag.id, { name: name.trim(), color });
       } else {
-        await createTag(name.trim(), color);
+        await createTag({ name: name.trim(), color });
       }
       onClose();
       setName('');
       setColor(COLORS[0]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save tag');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -105,9 +110,10 @@ export function TagModal({ isOpen, onClose, editTag }: TagModalProps) {
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={isLoading}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {editTag ? 'Save Changes' : 'Create Tag'}
+            {isLoading ? 'Saving...' : editTag ? 'Save Changes' : 'Create Tag'}
           </button>
         </div>
       </form>

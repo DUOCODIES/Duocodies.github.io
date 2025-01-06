@@ -1,166 +1,155 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
-import { useAuthStore } from './authStore';
 
 type Tag = Database['public']['Tables']['tags']['Row'];
 type NoteTag = Database['public']['Tables']['note_tags']['Row'];
 
-interface TagState {
-  tags: Tag[];
-  loading: boolean;
-  error: string | null;
-  fetchTags: () => Promise<void>;
-  createTag: (name: string, color: string) => Promise<Tag>;
-  updateTag: (id: string, updates: Partial<Tag>) => Promise<void>;
-  deleteTag: (id: string) => Promise<void>;
-  addTagToNote: (noteId: string, tagId: string) => Promise<void>;
-  removeTagFromNote: (noteId: string, tagId: string) => Promise<void>;
-  getNoteTags: (noteId: string) => Promise<Tag[]>;
+interface CreateTagParams {
+  name: string;
+  color: string;
 }
 
-export const useTagStore = create<TagState>((set, get) => ({
+interface UpdateTagParams {
+  name: string;
+  color: string;
+}
+
+interface TagStore {
+  tags: Tag[];
+  fetchTags: () => Promise<void>;
+  createTag: (params: CreateTagParams) => Promise<Tag>;
+  updateTag: (id: string, params: UpdateTagParams) => Promise<Tag>;
+  deleteTag: (id: string) => Promise<void>;
+  getNoteTags: (noteId: string) => Promise<Tag[]>;
+  addTagToNote: (noteId: string, tagId: string) => Promise<NoteTag>;
+  removeTagFromNote: (noteId: string, tagId: string) => Promise<void>;
+}
+
+export const useTagStore = create<TagStore>((set, get) => ({
   tags: [],
-  loading: false,
-  error: null,
 
   fetchTags: async () => {
-    set({ loading: true, error: null });
     try {
       const { data, error } = await supabase
         .from('tags')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
-      set({ tags: data || [], loading: false });
+      set({ tags: data || [] });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to fetch tags', loading: false });
+      console.error('Error fetching tags:', error);
     }
   },
 
-  createTag: async (name: string, color: string) => {
-    const user = useAuthStore.getState().user;
-    if (!user) throw new Error('User must be authenticated to create tags');
-
-    const newTag = {
-      user_id: user.id,
-      name,
-      color,
-      created_at: new Date().toISOString(),
-    };
-
+  createTag: async ({ name, color }) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated to create tags');
+
       const { data, error } = await supabase
         .from('tags')
-        .insert([newTag])
+        .insert([{ name, color, user_id: user.id }])
         .select()
         .single();
-      
+
       if (error) throw error;
-      set({ tags: [...get().tags, data] });
+      await get().fetchTags();
       return data;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to create tag');
-    }
-  },
-
-  updateTag: async (id: string, updates: Partial<Tag>) => {
-    const originalTag = get().tags.find(tag => tag.id === id);
-    if (!originalTag) return;
-
-    // Optimistic update
-    set({
-      tags: get().tags.map(tag =>
-        tag.id === id ? { ...tag, ...updates } : tag
-      ),
-    });
-
-    try {
-      const { error } = await supabase
-        .from('tags')
-        .update(updates)
-        .eq('id', id);
-      
-      if (error) throw error;
-    } catch (error) {
-      // Rollback on error
-      set({
-        tags: get().tags.map(tag =>
-          tag.id === id ? originalTag : tag
-        ),
-      });
+      console.error('Error creating tag:', error);
       throw error;
     }
   },
 
-  deleteTag: async (id: string) => {
-    const tagToDelete = get().tags.find(tag => tag.id === id);
-    if (!tagToDelete) return;
-
-    // Optimistic update
-    set({ tags: get().tags.filter(tag => tag.id !== id) });
-
+  updateTag: async (id, { name, color }) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated to update tags');
+
+      const { data, error } = await supabase
+        .from('tags')
+        .update({ name, color })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      await get().fetchTags();
+      return data;
+    } catch (error) {
+      console.error('Error updating tag:', error);
+      throw error;
+    }
+  },
+
+  deleteTag: async (id) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated to delete tags');
+
+      // First delete all note_tags associations
+      await supabase
+        .from('note_tags')
+        .delete()
+        .eq('tag_id', id);
+
+      // Then delete the tag
       const { error } = await supabase
         .from('tags')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
+      await get().fetchTags();
     } catch (error) {
-      // Rollback on error
-      set({ tags: [...get().tags, tagToDelete] });
+      console.error('Error deleting tag:', error);
       throw error;
     }
   },
 
-  addTagToNote: async (noteId: string, tagId: string) => {
+  getNoteTags: async (noteId) => {
     try {
-      const { error } = await supabase
-        .from('note_tags')
-        .insert([{ note_id: noteId, tag_id: tagId }]);
-      
+      const { data, error } = await supabase
+        .from('tags')
+        .select('*, note_tags!inner(*)')
+        .eq('note_tags.note_id', noteId);
+
       if (error) throw error;
+      return data || [];
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to add tag to note');
+      console.error('Error fetching note tags:', error);
+      return [];
     }
   },
 
-  removeTagFromNote: async (noteId: string, tagId: string) => {
+  addTagToNote: async (noteId, tagId) => {
+    try {
+      const { data, error } = await supabase
+        .from('note_tags')
+        .insert([{ note_id: noteId, tag_id: tagId }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error adding tag to note:', error);
+      throw error;
+    }
+  },
+
+  removeTagFromNote: async (noteId, tagId) => {
     try {
       const { error } = await supabase
         .from('note_tags')
         .delete()
         .match({ note_id: noteId, tag_id: tagId });
-      
+
       if (error) throw error;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to remove tag from note');
-    }
-  },
-
-  getNoteTags: async (noteId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('note_tags')
-        .select('tag_id')
-        .eq('note_id', noteId);
-      
-      if (error) throw error;
-
-      if (!data.length) return [];
-
-      const tagIds = data.map(nt => nt.tag_id);
-      const { data: tags, error: tagsError } = await supabase
-        .from('tags')
-        .select('*')
-        .in('id', tagIds);
-
-      if (tagsError) throw tagsError;
-      return tags || [];
-    } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to fetch note tags');
+      console.error('Error removing tag from note:', error);
     }
   },
 })); 

@@ -1,12 +1,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Menu, Plus, Search, Star, Trash2, LogOut, User, Command, X, Tag, Settings } from 'lucide-react';
-import { NewNoteModal } from './NewNoteModal';
-import { ConfirmationModal } from './ConfirmationModal';
-import { TagModal } from './TagModal';
+import { Search, Command, X, Plus, Settings, Trash2, Menu, Star, User, LogOut } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useNoteStore } from '../stores/noteStore';
 import { useTagStore } from '../stores/tagStore';
-import type { Filter } from '../stores/noteStore';
+import { NewNoteModal } from './NewNoteModal';
+import { TagModal } from './TagModal';
+import { ConfirmationModal } from './ConfirmationModal';
+import type { Database } from '../lib/database.types';
+type Tag = Database['public']['Tables']['tags']['Row'];
+
+type Filter = 'all' | 'favorites' | 'trash' | 'tag';
 
 export function Sidebar() {
   const [isNewNoteModalOpen, setIsNewNoteModalOpen] = useState(false);
@@ -16,6 +19,9 @@ export function Sidebar() {
   const { user, signOut } = useAuthStore();
   const { notes, filter, searchQuery, selectedTagId, setFilter, setSearchQuery, setSelectedTagId } = useNoteStore();
   const { tags, fetchTags, deleteTag } = useTagStore();
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
 
   // Fetch tags on mount
   useEffect(() => {
@@ -49,7 +55,15 @@ export function Sidebar() {
   };
 
   const handleTagClick = (tagId: string) => {
-    setSelectedTagId(tagId);
+    if (filter === 'tag' && selectedTagId === tagId) {
+      // If clicking the same tag again, clear the filter
+      setFilter('all');
+      setSelectedTagId(null);
+    } else {
+      // Set to tag filter and select the tag
+      setFilter('tag');
+      setSelectedTagId(tagId);
+    }
   };
 
   const handleEditTag = (tag: typeof tags[0]) => {
@@ -63,10 +77,31 @@ export function Sidebar() {
 
   const handleDeleteTag = async (tagId: string) => {
     try {
-      await deleteTag(tagId);
-      setSelectedTagId(null); // Clear tag filter if the deleted tag was selected
+      if (selectedTagId === tagId) {
+        setFilter('all');
+        setSelectedTagId(null);
+      }
+      // Note: Tag deletion is handled by the TagModal component
     } catch (error) {
       console.error('Failed to delete tag:', error);
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, tag: Tag) => {
+    e.stopPropagation();
+    setTagToDelete(tag);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (tagToDelete) {
+      try {
+        await deleteTag(tagToDelete.id);
+        setShowDeleteConfirm(false);
+        setTagToDelete(null);
+      } catch (error) {
+        console.error('Error deleting tag:', error);
+      }
     }
   };
 
@@ -182,7 +217,7 @@ export function Sidebar() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteTag(tag.id);
+                        handleDeleteClick(e, tag);
                       }}
                       className="p-1 hover:bg-gray-300 rounded-lg transition-colors"
                       title="Delete tag"
@@ -238,6 +273,19 @@ export function Sidebar() {
           setEditingTag(null);
         }}
         editTag={editingTag || undefined}
+      />
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setTagToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Tag"
+        message={`Are you sure you want to delete the tag "${tagToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete Tag"
+        isDanger={true}
       />
     </>
   );

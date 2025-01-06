@@ -3,21 +3,18 @@ import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
 
 type Note = Database['public']['Tables']['notes']['Row'];
-export type Filter = 'all' | 'favorites' | 'trash' | 'tag';
 
-interface NoteState {
+interface NoteStore {
   notes: Note[];
-  loading: boolean;
-  error: string | null;
-  filter: Filter;
-  searchQuery: string;
+  filter: 'all' | 'favorites' | 'trash' | 'tag';
   selectedTagId: string | null;
-  setFilter: (filter: Filter) => void;
+  searchQuery: string;
   setSearchQuery: (query: string) => void;
+  setFilter: (filter: 'all' | 'favorites' | 'trash' | 'tag') => void;
   setSelectedTagId: (tagId: string | null) => void;
   fetchNotes: () => Promise<void>;
   createNote: (title: string, content: string) => Promise<Note>;
-  updateNote: (id: string, updates: Partial<Note>) => Promise<void>;
+  updateNote: (id: string, title: string, content: string) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   moveToTrash: (id: string) => Promise<void>;
   restoreFromTrash: (id: string) => Promise<void>;
@@ -25,159 +22,156 @@ interface NoteState {
   getFilteredNotes: () => Note[];
 }
 
-export const useNoteStore = create<NoteState>((set, get) => ({
+export const useNoteStore = create<NoteStore>((set, get) => ({
   notes: [],
-  loading: false,
-  error: null,
   filter: 'all',
-  searchQuery: '',
   selectedTagId: null,
+  searchQuery: '',
 
-  setFilter: (filter) => set({ filter, searchQuery: '', selectedTagId: null }),
-  setSearchQuery: (searchQuery) => set({ searchQuery }),
-  setSelectedTagId: (tagId) => {
-    set({ selectedTagId: tagId, filter: tagId ? 'tag' : 'all', searchQuery: '' });
-  },
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setFilter: (filter) => set({ filter }),
+  setSelectedTagId: (tagId) => set({ selectedTagId: tagId }),
 
   fetchNotes: async () => {
-    set({ loading: true, error: null });
     try {
       const { data, error } = await supabase
         .from('notes')
         .select('*')
         .order('updated_at', { ascending: false });
-      
+
       if (error) throw error;
-      set({ notes: data || [], loading: false });
+      set({ notes: data || [] });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to fetch notes', loading: false });
+      console.error('Error fetching notes:', error);
     }
   },
 
-  createNote: async (title: string, content: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User must be authenticated to create notes');
-
-    const newNote = {
-      user_id: user.id,
-      title,
-      content,
-      is_favorite: false,
-      is_deleted: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
+  createNote: async (title, content) => {
     try {
-      const { data, error } = await supabase.from('notes').insert([newNote]).select().single();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated to create notes');
+
+      const { data, error } = await supabase
+        .from('notes')
+        .insert([{
+          title,
+          content,
+          user_id: user.id,
+          is_favorite: false,
+          is_deleted: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
       if (error) throw error;
-      get().fetchNotes();
+      await get().fetchNotes();
       return data;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to create note');
+      console.error('Error creating note:', error);
+      throw error;
     }
   },
 
-  updateNote: async (id: string, updates: Partial<Note>) => {
+  updateNote: async (id, title, content) => {
     try {
       const { error } = await supabase
         .from('notes')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update({ title, content, updated_at: new Date().toISOString() })
         .eq('id', id);
-      
+
       if (error) throw error;
-      get().fetchNotes();
+      await get().fetchNotes();
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to update note');
+      console.error('Error updating note:', error);
     }
   },
 
-  toggleFavorite: async (id: string) => {
-    const note = get().notes.find(n => n.id === id);
-    if (!note) return;
+  toggleFavorite: async (id) => {
+    try {
+      const note = get().notes.find(n => n.id === id);
+      if (!note) return;
 
+      const { error } = await supabase
+        .from('notes')
+        .update({ is_favorite: !note.is_favorite })
+        .eq('id', id);
+
+      if (error) throw error;
+      await get().fetchNotes();
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  },
+
+  moveToTrash: async (id) => {
     try {
       const { error } = await supabase
         .from('notes')
-        .update({ is_favorite: !note.is_favorite, updated_at: new Date().toISOString() })
+        .update({ is_deleted: true })
         .eq('id', id);
-      
+
       if (error) throw error;
-      get().fetchNotes();
+      await get().fetchNotes();
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to toggle favorite');
+      console.error('Error moving note to trash:', error);
     }
   },
 
-  moveToTrash: async (id: string) => {
+  restoreFromTrash: async (id) => {
     try {
       const { error } = await supabase
         .from('notes')
-        .update({ is_deleted: true, updated_at: new Date().toISOString() })
+        .update({ is_deleted: false })
         .eq('id', id);
-      
+
       if (error) throw error;
-      get().fetchNotes();
+      await get().fetchNotes();
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to move note to trash');
+      console.error('Error restoring note from trash:', error);
     }
   },
 
-  restoreFromTrash: async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('notes')
-        .update({ is_deleted: false, updated_at: new Date().toISOString() })
-        .eq('id', id);
-      
-      if (error) throw error;
-      get().fetchNotes();
-    } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to restore note');
-    }
-  },
-
-  permanentlyDelete: async (id: string) => {
+  permanentlyDelete: async (id) => {
     try {
       const { error } = await supabase
         .from('notes')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
-      get().fetchNotes();
+      await get().fetchNotes();
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to delete note');
+      console.error('Error deleting note permanently:', error);
     }
   },
 
   getFilteredNotes: () => {
-    const { notes, filter, searchQuery, selectedTagId } = get();
-    
+    const { notes, filter, searchQuery } = get();
     let filteredNotes = notes;
 
-    // First apply the main filter
+    // Apply filter
     switch (filter) {
       case 'favorites':
-        filteredNotes = notes.filter(note => note.is_favorite && !note.is_deleted);
+        filteredNotes = filteredNotes.filter(note => note.is_favorite);
         break;
       case 'trash':
-        filteredNotes = notes.filter(note => note.is_deleted);
+        filteredNotes = filteredNotes.filter(note => note.is_deleted);
         break;
-      case 'tag':
-        // Tag filtering will be handled by the component using the selectedTagId
-        filteredNotes = notes.filter(note => !note.is_deleted);
-        break;
+      case 'all':
       default:
-        filteredNotes = notes.filter(note => !note.is_deleted);
+        filteredNotes = filteredNotes.filter(note => !note.is_deleted);
+        break;
     }
 
-    // Then apply search if there's a query
-    if (searchQuery) {
+    // Apply search
+    if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filteredNotes = filteredNotes.filter(note =>
-        note.title.toLowerCase().includes(query) ||
-        note.content?.toLowerCase().includes(query)
+      filteredNotes = filteredNotes.filter(
+        note =>
+          note.title.toLowerCase().includes(query) ||
+          (note.content?.toLowerCase() || '').includes(query)
       );
     }
 
