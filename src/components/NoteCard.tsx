@@ -140,36 +140,39 @@ export function NoteCard({ id, title, content, updated_at, is_favorite, is_delet
   return (
     <>
       <div 
-        className="group bg-white p-4 rounded-lg border border-gray-200 hover:shadow-lg transition-all cursor-pointer"
+        className="group bg-white p-3 rounded-lg border border-gray-200 hover:shadow-lg transition-all cursor-pointer"
         onClick={() => {
           setShowMenu(false);
           setShowTagMenu(false);
         }}
       >
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="text-lg font-semibold text-gray-800 line-clamp-1">{title}</h3>
-          <div className="flex gap-2">
+        <div className="flex items-start justify-between mb-1">
+          <h3 className="text-base font-semibold text-gray-800 line-clamp-1">{title}</h3>
+          <div className="flex gap-1">
             {!is_deleted && (
               <>
                 <button
                   onClick={handleToggleFavorite}
-                  className={`p-1 rounded-full hover:bg-gray-100 transition-colors ${
+                  className={`p-0.5 rounded-full hover:bg-gray-100 transition-colors ${
                     is_favorite ? 'text-yellow-500' : 'text-gray-400 opacity-0 group-hover:opacity-100'
                   }`}
                   title={is_favorite ? 'Remove from favorites' : 'Add to favorites'}
                 >
-                  <Star size={18} />
+                  <Star size={16} />
                 </button>
                 <div className="relative" ref={tagMenuRef}>
                   <button
                     onClick={handleTagClick}
-                    className="p-1 rounded-full hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-0.5 rounded-full hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Manage tags"
                   >
-                    <TagIcon size={18} />
+                    <TagIcon size={16} />
                   </button>
                   {showTagMenu && (
                     <div className="absolute right-0 mt-1 py-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                      <div className="px-4 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-100">
+                        Select multiple tags
+                      </div>
                       {allTags.map(tag => (
                         <button
                           key={tag.id}
@@ -179,14 +182,16 @@ export function NoteCard({ id, title, content, updated_at, is_favorite, is_delet
                           }}
                           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
                         >
+                          <div className="flex items-center justify-center w-4 h-4 border border-gray-300 rounded">
+                            {noteTags.some(t => t.id === tag.id) && (
+                              <div className="w-2 h-2 rounded-sm bg-blue-500" />
+                            )}
+                          </div>
                           <div
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: tag.color }}
                           />
                           <span className="flex-1">{tag.name}</span>
-                          {noteTags.some(t => t.id === tag.id) && (
-                            <div className="w-4 h-4 rounded-full bg-blue-500" />
-                          )}
                         </button>
                       ))}
                       {allTags.length === 0 && (
@@ -202,10 +207,10 @@ export function NoteCard({ id, title, content, updated_at, is_favorite, is_delet
             <div className="relative" ref={menuRef}>
               <button
                 onClick={handleMoreClick}
-                className="p-1 rounded-full hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-0.5 rounded-full hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="More options"
               >
-                <MoreVertical size={18} />
+                <MoreVertical size={16} />
               </button>
               {showMenu && (
                 <div className="absolute right-0 mt-1 py-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
@@ -234,14 +239,14 @@ export function NoteCard({ id, title, content, updated_at, is_favorite, is_delet
                       >
                         <Pencil size={16} />
                         Edit note
-                      </button>
+          </button>
                       <button
                         onClick={handleDelete}
                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                       >
                         <Trash2 size={16} />
                         Move to trash
-                      </button>
+          </button>
                     </>
                   )}
                 </div>
@@ -250,15 +255,15 @@ export function NoteCard({ id, title, content, updated_at, is_favorite, is_delet
           </div>
         </div>
         {noteTags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2">
+          <div className="flex flex-wrap gap-1 mb-1">
             {noteTags.map(tag => (
               <div
                 key={tag.id}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px]"
                 style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
               >
                 <div
-                  className="w-2 h-2 rounded-full"
+                  className="w-1.5 h-1.5 rounded-full"
                   style={{ backgroundColor: tag.color }}
                 />
                 {tag.name}
@@ -266,10 +271,10 @@ export function NoteCard({ id, title, content, updated_at, is_favorite, is_delet
             ))}
           </div>
         )}
-        <p className="text-gray-600 mb-4 line-clamp-3 whitespace-pre-wrap">
+        <p className="text-sm text-gray-600 mb-2 line-clamp-2 whitespace-pre-wrap">
           {renderContentWithLinks(content)}
         </p>
-        <time className="text-sm text-gray-400">{formattedDate}</time>
+        <time className="text-xs text-gray-400">{formattedDate}</time>
       </div>
 
       <EditNoteModal

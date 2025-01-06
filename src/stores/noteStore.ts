@@ -16,7 +16,7 @@ interface NoteState {
   setSearchQuery: (query: string) => void;
   setSelectedTagId: (tagId: string | null) => void;
   fetchNotes: () => Promise<void>;
-  createNote: (title: string, content: string) => Promise<void>;
+  createNote: (title: string, content: string) => Promise<Note>;
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   moveToTrash: (id: string) => Promise<void>;
@@ -69,9 +69,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     };
 
     try {
-      const { error } = await supabase.from('notes').insert([newNote]);
+      const { data, error } = await supabase.from('notes').insert([newNote]).select().single();
       if (error) throw error;
       get().fetchNotes();
+      return data;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to create note');
     }
