@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { LayoutGrid, List, Star, Trash2, Tag as TagIcon, X, Bookmark, CheckSquare } from 'lucide-react';
+import { LayoutGrid, List, Star, Trash2, Tag as TagIcon, X, Bookmark, CheckSquare, FileSpreadsheet, FileText } from 'lucide-react';
 import { useNoteStore } from '../stores/noteStore';
 import { useTagStore } from '../stores/tagStore';
 import { NoteCard } from './NoteCard';
@@ -178,6 +178,20 @@ export function Dashboard() {
             title="Import bookmarks"
           >
             <Bookmark size={20} />
+          </button>
+          <button
+            onClick={() => window.open('https://docs.google.com/document/create', '_blank')}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+            title="Create Google Doc"
+          >
+            <FileText size={20} />
+          </button>
+          <button
+            onClick={() => window.open('https://docs.google.com/spreadsheets/create', '_blank')}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+            title="Create Excel Sheet"
+          >
+            <FileSpreadsheet size={20} />
           </button>
           {displayedNotes.length > 0 && (
             <button
