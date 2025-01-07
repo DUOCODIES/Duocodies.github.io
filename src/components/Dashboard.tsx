@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
-import { LayoutGrid, List, Star, Trash2, Tag as TagIcon, X, Bookmark, CheckSquare, FileSpreadsheet, FileText } from 'lucide-react';
+import { LayoutGrid, List, Star, Trash2, Tag as TagIcon, X, Bookmark, CheckSquare, FileSpreadsheet, FileText, Settings } from 'lucide-react';
 import { useNoteStore } from '../stores/noteStore';
 import { useTagStore } from '../stores/tagStore';
 import { NoteCard } from './NoteCard';
 import { ConfirmationModal } from './ConfirmationModal';
+import { Banner } from './Banner';
 import type { Database } from '../lib/database.types';
 import { ImportBookmarksModal } from './ImportBookmarksModal';
+import { BannerEditModal } from './BannerEditModal';
 
 type Note = Database['public']['Tables']['notes']['Row'];
 type Tag = Database['public']['Tables']['tags']['Row'];
@@ -48,6 +50,20 @@ export function Dashboard() {
   const [showBulkTagMenu, setShowBulkTagMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showImportBookmarks, setShowImportBookmarks] = useState(false);
+  const [showBanner, setShowBanner] = useState(() => {
+    const saved = localStorage.getItem('bannerVisible');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [showBannerEdit, setShowBannerEdit] = useState(false);
+  const [bannerText, setBannerText] = useState(() => 
+    localStorage.getItem('bannerText') || 'Welcome to Notes! 🎉 Create, organize, and manage your notes with ease.'
+  );
+  const [bannerBgColor, setBannerBgColor] = useState(() => 
+    localStorage.getItem('bannerBgColor') || '#4F46E5'
+  );
+  const [bannerTextColor, setBannerTextColor] = useState(() => 
+    localStorage.getItem('bannerTextColor') || 'white'
+  );
   const tagMenuRef = useRef<HTMLDivElement>(null);
 
   const displayedNotes = useMemo(() => 
@@ -190,160 +206,227 @@ export function Dashboard() {
     </div>
   ), [displayedNotes, isGridView, selectedNotes, toggleNoteSelection]);
 
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsGridView(true)}
-            className={`p-2 rounded-lg transition-colors ${
-              isGridView ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
-            }`}
-          >
-            <LayoutGrid size={20} />
-          </button>
-          <button
-            onClick={() => setIsGridView(false)}
-            className={`p-2 rounded-lg transition-colors ${
-              !isGridView ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
-            }`}
-          >
-            <List size={20} />
-          </button>
-          <button
-            onClick={() => setShowImportBookmarks(true)}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors ml-2"
-            title="Import bookmarks"
-          >
-            <Bookmark size={20} />
-          </button>
-          <button
-            onClick={() => window.open('https://docs.google.com/document/create', '_blank')}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-            title="Create Google Doc"
-          >
-            <FileText size={20} />
-          </button>
-          <button
-            onClick={() => window.open('https://docs.google.com/spreadsheets/create', '_blank')}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-            title="Create Excel Sheet"
-          >
-            <FileSpreadsheet size={20} />
-          </button>
-          {displayedNotes.length > 0 && (
-            <button
-              onClick={handleSelectAll}
-              className={`p-2 rounded-lg transition-colors ${
-                hasSelectedNotes ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
-              }`}
-              title={allSelected ? 'Deselect all' : 'Select all'}
-            >
-              <CheckSquare size={20} />
-            </button>
-          )}
-        </div>
+  const handleBannerSave = useCallback(({ 
+    text, 
+    backgroundColor, 
+    textColor 
+  }: { 
+    text: string; 
+    backgroundColor: string; 
+    textColor: string; 
+  }) => {
+    setBannerText(text);
+    setBannerBgColor(backgroundColor);
+    setBannerTextColor(textColor);
+  }, []);
 
-        {hasSelectedNotes && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">
-              {selectedCount} of {displayedNotes.length} selected
-            </span>
-            <button
-              onClick={handleBulkFavorite}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-              title="Toggle favorite for selected notes"
-            >
-              <Star size={20} />
-            </button>
-            <div className="relative" ref={tagMenuRef}>
-              <button
-                onClick={() => setShowBulkTagMenu(!showBulkTagMenu)}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-                title="Add tags to selected notes"
-              >
-                <TagIcon size={20} />
-              </button>
-              {showBulkTagMenu && (
-                <div className="absolute right-0 mt-1 py-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                  <div className="px-4 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-100">
-                    Toggle tags for selected notes
-                  </div>
-                  {allTags.map(tag => (
-                    <button
-                      key={tag.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleBulkAddTag(tag.id);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                      disabled={loading}
-                    >
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: tag.color }}
-                      />
-                      <span className="flex-1">{tag.name}</span>
-                      {loading && (
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                      )}
-                    </button>
-                  ))}
-                  {allTags.length === 0 && (
-                    <div className="px-4 py-2 text-sm text-gray-500">
-                      No tags available
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="p-2 rounded-lg hover:bg-red-100 text-red-600 transition-colors"
-              title={filter === 'trash' ? 'Delete selected notes permanently' : 'Move selected notes to trash'}
-            >
-              <Trash2 size={20} />
-            </button>
-            <button
-              onClick={() => setSelectedNotes(new Set())}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-              title="Clear selection"
-            >
-              <X size={20} />
-            </button>
-          </div>
+  // Save banner visibility to localStorage
+  useEffect(() => {
+    localStorage.setItem('bannerVisible', JSON.stringify(showBanner));
+  }, [showBanner]);
+
+  // Save banner settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('bannerText', bannerText);
+    localStorage.setItem('bannerBgColor', bannerBgColor);
+    localStorage.setItem('bannerTextColor', bannerTextColor);
+  }, [bannerText, bannerBgColor, bannerTextColor]);
+
+  return (
+    <>
+      <div className="relative">
+        <Banner
+          isVisible={showBanner}
+          onClose={() => setShowBanner(false)}
+          backgroundColor={bannerBgColor}
+          textColor={bannerTextColor}
+        >
+          <span>{bannerText}</span>
+        </Banner>
+        {!showBanner && (
+          <button
+            onClick={() => setShowBanner(true)}
+            className="absolute top-2 right-2 p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+            title="Show banner"
+          >
+            <Settings size={20} />
+          </button>
+        )}
+        {showBanner && (
+          <button
+            onClick={() => setShowBannerEdit(true)}
+            className="absolute top-1/2 right-16 -translate-y-1/2 p-1.5 rounded-lg hover:bg-opacity-20 hover:bg-gray-700 text-current transition-colors"
+            style={{ color: bannerTextColor }}
+            title="Edit banner"
+          >
+            <Settings size={20} />
+          </button>
         )}
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      ) : displayedNotes.length === 0 ? (
-        <div className="text-center text-gray-500 mt-12">
-          <p className="text-lg">No notes found</p>
-          <p className="text-sm mt-1">Create a new note to get started</p>
-        </div>
-      ) : renderNotes}
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsGridView(true)}
+              className={`p-2 rounded-lg transition-colors ${
+                isGridView ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
+              }`}
+            >
+              <LayoutGrid size={20} />
+            </button>
+            <button
+              onClick={() => setIsGridView(false)}
+              className={`p-2 rounded-lg transition-colors ${
+                !isGridView ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
+              }`}
+            >
+              <List size={20} />
+            </button>
+            <button
+              onClick={() => setShowImportBookmarks(true)}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors ml-2"
+              title="Import bookmarks"
+            >
+              <Bookmark size={20} />
+            </button>
+            <button
+              onClick={() => window.open('https://docs.google.com/document/create', '_blank')}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+              title="Create Google Doc"
+            >
+              <FileText size={20} />
+            </button>
+            <button
+              onClick={() => window.open('https://docs.google.com/spreadsheets/create', '_blank')}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+              title="Create Excel Sheet"
+            >
+              <FileSpreadsheet size={20} />
+            </button>
+            {displayedNotes.length > 0 && (
+              <button
+                onClick={handleSelectAll}
+                className={`p-2 rounded-lg transition-colors ${
+                  hasSelectedNotes ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
+                }`}
+                title={allSelected ? 'Deselect all' : 'Select all'}
+              >
+                <CheckSquare size={20} />
+              </button>
+            )}
+          </div>
 
-      <ConfirmationModal
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleBulkDelete}
-        title={filter === 'trash' ? 'Delete Notes Permanently' : 'Move to Trash'}
-        message={
-          filter === 'trash'
-            ? `Are you sure you want to permanently delete ${selectedNotes.size} notes? This action cannot be undone.`
-            : `Are you sure you want to move ${selectedNotes.size} notes to trash?`
-        }
-        confirmText={filter === 'trash' ? 'Delete Forever' : 'Move to Trash'}
-        isDanger={filter === 'trash'}
-      />
+          {hasSelectedNotes && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                {selectedCount} of {displayedNotes.length} selected
+              </span>
+              <button
+                onClick={handleBulkFavorite}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+                title="Toggle favorite for selected notes"
+              >
+                <Star size={20} />
+              </button>
+              <div className="relative" ref={tagMenuRef}>
+                <button
+                  onClick={() => setShowBulkTagMenu(!showBulkTagMenu)}
+                  className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+                  title="Add tags to selected notes"
+                >
+                  <TagIcon size={20} />
+                </button>
+                {showBulkTagMenu && (
+                  <div className="absolute right-0 mt-1 py-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                    <div className="px-4 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-100">
+                      Toggle tags for selected notes
+                    </div>
+                    {allTags.map(tag => (
+                      <button
+                        key={tag.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBulkAddTag(tag.id);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                        disabled={loading}
+                      >
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <span className="flex-1">{tag.name}</span>
+                        {loading && (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                        )}
+                      </button>
+                    ))}
+                    {allTags.length === 0 && (
+                      <div className="px-4 py-2 text-sm text-gray-500">
+                        No tags available
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="p-2 rounded-lg hover:bg-red-100 text-red-600 transition-colors"
+                title={filter === 'trash' ? 'Delete selected notes permanently' : 'Move selected notes to trash'}
+              >
+                <Trash2 size={20} />
+              </button>
+              <button
+                onClick={() => setSelectedNotes(new Set())}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+                title="Clear selection"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          )}
+        </div>
 
-      <ImportBookmarksModal
-        isOpen={showImportBookmarks}
-        onClose={() => setShowImportBookmarks(false)}
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : displayedNotes.length === 0 ? (
+          <div className="text-center text-gray-500 mt-12">
+            <p className="text-lg">No notes found</p>
+            <p className="text-sm mt-1">Create a new note to get started</p>
+          </div>
+        ) : renderNotes}
+
+        <ConfirmationModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleBulkDelete}
+          title={filter === 'trash' ? 'Delete Notes Permanently' : 'Move to Trash'}
+          message={
+            filter === 'trash'
+              ? `Are you sure you want to permanently delete ${selectedNotes.size} notes? This action cannot be undone.`
+              : `Are you sure you want to move ${selectedNotes.size} notes to trash?`
+          }
+          confirmText={filter === 'trash' ? 'Delete Forever' : 'Move to Trash'}
+          isDanger={filter === 'trash'}
+        />
+
+        <ImportBookmarksModal
+          isOpen={showImportBookmarks}
+          onClose={() => setShowImportBookmarks(false)}
+        />
+      </div>
+
+      <BannerEditModal
+        isOpen={showBannerEdit}
+        onClose={() => setShowBannerEdit(false)}
+        onSave={handleBannerSave}
+        currentText={bannerText}
+        currentBackgroundColor={bannerBgColor}
+        currentTextColor={bannerTextColor}
       />
-    </div>
+    </>
   );
 }
